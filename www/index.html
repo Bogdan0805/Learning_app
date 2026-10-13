@@ -8,7 +8,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px)}
 #app{max-width:560px;margin:0 auto;padding:16px}
 h1,h2{margin:.3em 0}.mut{color:var(--mut)}.c{text-align:center}.big{font-size:64px}
 .card{background:var(--card);border-radius:16px;padding:14px;margin:10px 0}
-.btn{display:block;width:100%;border:0;border-bottom:4px solid var(--pd);background:var(--pri);color:#fff;font:700 16px inherit;padding:14px;border-radius:14px;margin:10px 0;cursor:pointer;text-transform:uppercase;letter-spacing:.04em}
+.btn{display:block;width:100%;border:0;border-bottom:4px solid var(--pd);background:var(--pri);color:#fff;font-weight:700;font-size:16px;font-family:inherit;padding:14px;border-radius:14px;margin:10px 0;cursor:pointer;text-transform:uppercase;letter-spacing:.04em}
 .btn.alt{background:var(--card);color:var(--fg);border-color:#9ca3af55}
 .opt{display:block;width:100%;text-align:left;background:var(--card);color:var(--fg);border:2px solid #9ca3af66;border-radius:12px;padding:12px;margin:8px 0;font:inherit;cursor:pointer}
 .opt.ok{border-color:var(--pri);background:#58cc0233}.opt.no{border-color:var(--bad);background:#ef444433;opacity:.6}
@@ -253,8 +253,8 @@ function drawW(c,a0){const x=c.getContext('2d'),W=c.width,R=W/2-6,it=items(),t=i
 function spinW(cb){const it=items(),t=it.reduce((p,q)=>p+q.w,0);let r=Math.random()*t,pick=it[0],st=0;for(const q of it){if(r<q.w){pick=q;break}r-=q.w;st+=q.w}
 const s=pick.w/t*2*Math.PI,mid=st/t*2*Math.PI+s*(0.5+(Math.random()-.5)*.7);let target=-Math.PI/2-mid;target-=Math.floor(target/(2*Math.PI))*2*Math.PI;const from=ang,end=ang+(((target-ang)%(2*Math.PI))+2*Math.PI)%(2*Math.PI)+10*Math.PI,t0=performance.now(),c=$('#w');
 (function f(n){const k=Math.min(1,(n-t0)/4000),e=1-Math.pow(1-k,3);ang=from+(end-from)*e;drawW(c,ang);if(k<1)requestAnimationFrame(f);else if(cb)setTimeout(()=>cb(pick.id),500)})(t0)}
-function home(){inLesson=false;A.innerHTML=head()+mascot(S.cnt>=S.n?'Дневная цель выполнена! Так держать 🎉':'Готов учиться? Всего ~10 минут!')+`<button class="btn" onclick="startChoice()">Начать урок</button><div class="card"><b>Прогресс</b>${ids.filter(i=>S.subs[i]>0).map(i=>{const p=(S.p[i]||0);return `<div class="row"><span>${D[i].e}</span><b style="font-size:14px">${D[i].n}</b><span style="font-size:13px">${p}/100</span></div><div class="bar"><i style="width:${p}%"></i></div>`}).join('')}</div><button class="btn alt" onclick="setup1()">Изменить предметы</button><button class="btn alt" onclick="S.setup=false;setup1()" style="display:none"></button><button class="btn alt" onclick="DEMO.on=true;trig=null;alert('Демо: через 8 сек появится баннер, интервал между показами — 8 сек');">Демо напоминаний</button>`}
-function startChoice(){hideBan();A.innerHTML=head()+`<h2>Как выберем урок?</h2><button class="btn" onclick="randomPick()">🎡 Отдаться рандому</button><button class="btn alt" onclick="manual()">Выбрать самому</button><button class="btn alt" onclick="home()">Назад</button>`}
+function home(){leaveFlow();A.innerHTML=head()+mascot(S.cnt>=S.n?'Дневная цель выполнена! Так держать 🎉':'Готов учиться? Всего ~10 минут!')+`<button class="btn" onclick="startChoice()">Начать урок</button><div class="card"><b>Прогресс</b>${ids.filter(i=>S.subs[i]>0).map(i=>{const p=(S.p[i]||0);return `<div class="row"><span>${D[i].e}</span><b style="font-size:14px">${D[i].n}</b><span style="font-size:13px">${p}/100</span></div><div class="bar"><i style="width:${p}%"></i></div>`}).join('')}</div><button class="btn alt" onclick="setup1()">Изменить предметы</button>${demoBtn()}`}
+function startChoice(){inLesson=true;hideBan();A.innerHTML=head()+`<h2>Как выберем урок?</h2><button class="btn" onclick="randomPick()">🎡 Отдаться рандому</button><button class="btn alt" onclick="manual()">Выбрать самому</button><button class="btn alt" onclick="home()">Назад</button>`}
 function randomPick(){A.innerHTML=`<h2 class="c">Крутим колесо…</h2><div class="ptr">▼</div><canvas id="w" width="300" height="300"></canvas>`;drawW($('#w'),ang);spinW(id=>{A.innerHTML+=mascot(D[id].e+' '+D[id].n);setTimeout(()=>begin(id),1200)})}
 function manual(){A.innerHTML=`<h2>Выбери предмет</h2>`+ids.map(i=>`<button class="opt" onclick="begin('${i}')">${D[i].e} ${D[i].n} <span class="mut">— урок ${(S.p[i]||0)+1}</span></button>`).join('')+`<button class="btn alt" onclick="startChoice()">Назад</button>`}
 function begin(id){const p=S.p[id]||0,L=D[id].L;let review=S.total%4===3&&p>0,qs,title,th;
@@ -268,16 +268,23 @@ function ans(k,b){const q=LS.qs[LS.i-1],bs=[...document.querySelectorAll('.opt')
 function done(t){bs.forEach(x=>x.disabled=true);$('#fb').innerHTML=`<div class="card">${t}</div><button class="btn" onclick="step()">Дальше</button>`}}
 function finish(){const d=today();if(!LS.review)S.p[LS.id]=Math.min(100,(S.p[LS.id]||0)+1);S.total++;S.xp+=10*LS.ok+5;S.cnt++;
 if(S.last!==d){const y=new Date(Date.now()-864e5).toDateString();S.streak=S.last===y?S.streak+1:1;S.last=d}save();
-A.innerHTML=`<div class="bar"><i style="width:100%"></i></div>`+mascot('Урок пройден! 🎉')+`<div class="card c">С первой попытки: <b>${LS.ok}/${LS.qs.length}</b><br>Опыт: <b>+${10*LS.ok+5}</b></div>`+(S.cnt<S.n?`<button class="btn" onclick="startChoice()">Следующий урок</button>`:'')+`<button class="btn alt" onclick="home()">На главную</button>`;inLesson=false;if(S.cnt>=S.n){trig=null;hideBan()}}
+A.innerHTML=`<div class="bar"><i style="width:100%"></i></div>`+mascot('Урок пройден! 🎉')+`<div class="card c">С первой попытки: <b>${LS.ok}/${LS.qs.length}</b><br>Опыт: <b>+${10*LS.ok+5}</b></div>`+(S.cnt<S.n?`<button class="btn" onclick="startChoice()">Следующий урок</button>`:'')+`<button class="btn alt" onclick="home()">На главную</button>`;leaveFlow();if(S.cnt>=S.n){trig=null;stage=0;hideBan();DEMO.on=false}}
 const ST=[['⏰ Пора учиться!','Бит ждёт тебя. Всего 10 минут!'],['😠 Ты обещал(а)!','Бит уже сердится. Не откладывай!'],['🔥 ПОСЛЕДНИЙ ШАНС!','Бит в ярости! Пройди урок СЕЙЧАС!']];
+const intv=()=>DEMO.on?8000:60000,banUp=()=>$('#ban').style.display==='flex';
 function showBan(){stage=Math.min(stage+1,3);const b=$('#ban'),t=ST[stage-1];b.className='s'+stage;b.style.display='flex';b.innerHTML=`<div class="big">${['🤖','😠','👿'][stage-1]}</div><h1>${t[0]}</h1><p>${t[1]}</p><button class="btn" style="background:#fff;color:#111;border-color:#ddd" onclick="startChoice()">Учиться</button><button class="btn alt" style="background:#0003;color:#fff" onclick="closeBan()">Закрыть</button>`}
-function closeBan(){hideBan();nextShow=Date.now()+(DEMO.on?8000:60000)}
+function closeBan(){hideBan();nextShow=Date.now()+intv()}
 function hideBan(){$('#ban').style.display='none'}
-setInterval(()=>{if(!S.setup)return;if(S.day!==today()){S.day=today();S.cnt=0;trig=null;save()}
-if(S.cnt>=S.n){trig=null;stage=0;return}
+function leaveFlow(){inLesson=false;if(stage>0)nextShow=Math.max(nextShow,Date.now()+intv())}
+function demoBtn(){return DEMO.on?`<div class="card">🧪 Демо идёт: баннер появится через ~5 секунд и будет возвращаться каждые 8 секунд, пока ты на главной. Три стадии грозности.</div><button class="btn alt" onclick="toggleDemo()">Остановить демо</button>`:`<button class="btn alt" onclick="toggleDemo()">Демо напоминаний</button>`}
+function toggleDemo(){DEMO.on=!DEMO.on;trig=null;stage=0;nextShow=0;hideBan();home()}
+function notify(){try{if(window.Notification&&Notification.permission==='granted')new Notification('Бит: пора учиться! 🤖',{body:'Дневной урок ждёт тебя'})}catch(e){}}
+function tick(){if(!S.setup)return;if(S.day!==today()){S.day=today();S.cnt=0;trig=null;stage=0;save()}
+if(S.cnt>=S.n&&!DEMO.on){trig=null;stage=0;if(banUp())hideBan();return}
 const [h,m]=S.time.split(':').map(Number),d=new Date(),due=DEMO.on||d.getHours()*60+d.getMinutes()>=h*60+m;
 if(!due)return;
-if(!trig){trig=Date.now();stage=0;nextShow=trig+(DEMO.on?8000:300000);try{if(Notification.permission==='granted')new Notification('Бит: пора учиться! 🤖',{body:'Дневной урок ждёт тебя'})}catch(e){}}
-if(!inLesson&&Date.now()>=nextShow&&$('#ban').style.display!=='flex'){showBan()}},1000);
+if(!trig){trig=Date.now();stage=0;nextShow=trig+(DEMO.on?5000:300000);notify()}
+if(!inLesson&&!banUp()&&Date.now()>=nextShow)showBan()}
+setInterval(tick,1000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});
 S.setup?home():setup1();
 </script></body></html>
