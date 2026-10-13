@@ -19,15 +19,22 @@ jobs:
           java-version: 17
       - run: npm install
       - run: npx cap add android
+      # Встраиваем нативный код: баннеры поверх приложений, фоновая служба, разрешения
+      - run: python3 native/patch_android.py
       - run: npx cap sync android
+      # Постоянный ключ подписи: новые версии устанавливаются поверх предыдущих
+      - run: mkdir -p ~/.android && cp native/debug.keystore ~/.android/debug.keystore
       - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
-      - run: cp android/app/build/outputs/apk/debug/app-debug.apk Bit-learning-app.apk
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk Bit-learning-app-002.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Bit-learning-app-apk
-          path: Bit-learning-app.apk
+          name: Bit-learning-app-002-apk
+          path: Bit-learning-app-002.apk
+      # Отдельный релиз 002. Релиз «latest» со старой сборкой не трогаем.
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: Последняя сборка APK
-          files: Bit-learning-app.apk
+          tag_name: "002"
+          name: "Версия 002 — баннеры поверх других приложений"
+          body: "Сборка 002: баннер-напоминание поверх других приложений, работа в фоне, три стадии грозности. Предыдущая версия остаётся в релизе «Последняя сборка APK»."
+          files: Bit-learning-app-002.apk
+          make_latest: "false"
