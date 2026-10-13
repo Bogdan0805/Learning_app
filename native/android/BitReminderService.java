@@ -49,12 +49,13 @@ public class BitReminderService extends Service {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ReminderLogic logic = new ReminderLogic();
+    private int ticks = 0;
     private View overlay;
     private ObjectAnimator shake;
 
     private final Runnable loop = new Runnable() {
         @Override public void run() {
-            try { tick(); } catch (Throwable ignored) { }
+            try { tick(); } catch (Throwable t) { noteErr(t); }
             handler.postDelayed(this, 1000);
         }
     };
@@ -72,16 +73,29 @@ public class BitReminderService extends Service {
         } else {
             startForeground(ID_BG, n);
         }
+        WakeReceiver.arm(this, 90000);
         handler.removeCallbacks(loop);
         handler.post(loop);
         return START_STICKY;
+    }
+
+    @Override public void onTaskRemoved(Intent rootIntent) {
+        // пользователь смахнул приложение из списка — быстро перезапускаем службу
+        WakeReceiver.arm(this, 2000);
+        super.onTaskRemoved(rootIntent);
     }
 
     @Override public void onDestroy() {
         running = false;
         handler.removeCallbacks(loop);
         hideOverlay();
+        boolean en = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("enabled", false);
+        if (en) WakeReceiver.arm(this, 3000); else WakeReceiver.disarm(this);
         super.onDestroy();
+    }
+
+    private void noteErr(Throwable t) {
+        try { getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("lastErr", String.valueOf(t)).apply(); } catch (Throwable ignored) { }
     }
 
     @Override public IBinder onBind(Intent intent) { return null; }
@@ -104,6 +118,9 @@ public class BitReminderService extends Service {
         ReminderLogic L = logic;
         L.enabled = p.getBoolean("enabled", false);
         if (!L.enabled) { hideOverlay(); stopSelf(); return; }
+        ticks++;
+        if (ticks % 5 == 1) p.edit().putLong("lastTick", System.currentTimeMillis()).apply();
+        if (ticks % 30 == 1) WakeReceiver.arm(this, 90000);
         L.dueMinutes = parseMinutes(p.getString("time", "17:00"));
         L.perDay = Math.max(1, p.getInt("n", 1));
         L.cnt = p.getInt("cnt", 0);
@@ -260,6 +277,7 @@ public class BitReminderService extends Service {
             overlay = root;
         } catch (Throwable t) {
             if (shake != null) { shake.cancel(); shake = null; }
+            noteErr(t);
             logic.bannerClosed(System.currentTimeMillis());
         }
     }

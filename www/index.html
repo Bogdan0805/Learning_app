@@ -279,23 +279,25 @@ function demoBtn(){return DEMO.on?`<div class="card">🧪 Демо идёт: б�
 function toggleDemo(){DEMO.on=!DEMO.on;trig=null;stage=0;nextShow=0;hideBan();pushState();home()}
 function notify(){try{if(window.Notification&&Notification.permission==='granted')new Notification('Бит: пора учиться! 🤖',{body:'Дневной урок ждёт тебя'})}catch(e){}}
 function tick(){if(!S.setup)return;if(S.day!==today()){S.day=today();S.cnt=0;trig=null;stage=0;save()}
-if(nat.ok&&nat.overlay){if(banUp())hideBan();pollNative();return}
+if(NB()&&++tc%30===0)refreshNative();
+if(nat.ok&&nat.overlay&&nat.run){if(banUp())hideBan();pollNative();return}
 if(S.cnt>=S.n&&!DEMO.on){trig=null;stage=0;if(banUp())hideBan();return}
 const [h,m]=S.time.split(':').map(Number),d=new Date(),due=DEMO.on||d.getHours()*60+d.getMinutes()>=h*60+m;
 if(!due)return;
 if(!trig){trig=Date.now();stage=0;nextShow=trig+(DEMO.on?5000:300000);notify()}
 if(!inLesson&&!banUp()&&Date.now()>=nextShow)showBan()}
 function NB(){try{return window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform()&&Capacitor.Plugins&&Capacitor.Plugins.BitReminder||null}catch(e){return null}}
-let nat={ok:false,overlay:false,notif:true,battery:false},tc=0;
+let nat={ok:false,overlay:false,notif:true,battery:false,run:false,err:''},tc=0,rfT=0;
 function dayKey(){const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
 function pushState(){try{const n=NB();if(!n)return;n.sync({enabled:!!S.setup,time:S.time||'17:00',n:S.n||1,cnt:S.cnt||0,dayKey:dayKey(),busy:!!inLesson,demo:!!DEMO.on}).catch(()=>{})}catch(e){}}
 function permHtml(){if(!nat.ok)return '';const r=(v,t)=>`<div class="row"><span>${v?'✅':'⚠️'}</span><b style="font-size:14px">${t}</b></div>`;
-return `<div class="card"><b>Напоминания в фоне</b>${r(nat.overlay,'Баннер поверх других приложений')}${nat.overlay?'':'<button class="btn" onclick="askOverlay()">Разрешить показ поверх приложений</button>'}${r(nat.notif,'Уведомления')}${nat.notif?'':'<button class="btn alt" onclick="askNotif()">Разрешить уведомления</button>'}${r(nat.battery,'Без ограничений батареи')}${nat.battery?'':'<button class="btn alt" onclick="askBattery()">Не ограничивать в фоне</button>'}</div>`}
-function refreshNative(){const n=NB();if(!n)return;n.hasOverlay().then(r=>{nat={ok:true,overlay:!!r.overlay,notif:r.notifications!==false,battery:!!r.battery};const e=document.querySelector('#perm');if(e)e.innerHTML=permHtml();if(nat.overlay&&banUp())hideBan();if(!nat.notif&&S.setup&&!S.askedNotif){S.askedNotif=true;save();n.requestNotifications().catch(()=>{})}pushState()}).catch(()=>{})}
+return `<div class="card"><b>Напоминания в фоне</b>${r(nat.overlay,'Баннер поверх других приложений')}${nat.overlay?'':'<button class="btn" onclick="askOverlay()">Разрешить показ поверх приложений</button>'}${r(nat.notif,'Уведомления')}${nat.notif?'':'<button class="btn alt" onclick="askNotif()">Разрешить уведомления</button>'}${r(nat.battery,'Без ограничений батареи')}${nat.battery?'':'<button class="btn alt" onclick="askBattery()">Не ограничивать в фоне</button>'}${r(nat.run,'Служба напоминаний: '+(nat.run?'работает':'не отвечает'))}${nat.err&&!nat.run?'<div class="mut" style="font-size:12px">'+String(nat.err).slice(0,80).replace(/</g,'&lt;')+'</div>':''}<div class="mut" style="font-size:12px;margin:6px 0">На Xiaomi, Huawei и Samsung ещё включи автозапуск и «Без ограничений» в настройках батареи для «Бит».</div><button class="btn alt" onclick="askAppSettings()">Настройки приложения</button></div>`}
+function refreshNative(){const n=NB();if(!n)return;n.hasOverlay().then(r=>{const age=(r.now||Date.now())-(r.lastTick||0);nat={ok:true,overlay:!!r.overlay,notif:r.notifications!==false,battery:!!r.battery,run:!!r.running&&r.lastTick>0&&age<15000,err:r.lastErr||''};const e=document.querySelector('#perm');if(e)e.innerHTML=permHtml();if(nat.overlay&&nat.run&&banUp())hideBan();if(!nat.notif&&S.setup&&!S.askedNotif){S.askedNotif=true;save();n.requestNotifications().catch(()=>{})}pushState();if(nat.overlay&&!nat.run&&!rfT)rfT=setTimeout(()=>{rfT=0;refreshNative()},2500)}).catch(()=>{})}
 function askOverlay(){const n=NB();if(!n)return;alert('Откроются настройки. Включи для «Бит» пункт «Поверх других приложений», затем вернись в приложение.');n.requestOverlay()}
 function askNotif(){const n=NB();if(n)n.requestNotifications().then(()=>setTimeout(refreshNative,800)).catch(()=>{})}
 function askBattery(){const n=NB();if(n)n.requestBattery()}
-function pollNative(){const n=NB();if(!n)return;if(++tc%30===0)pushState();n.getPending().then(r=>{if(r&&r.start&&!inLesson)startChoice()}).catch(()=>{})}
+function askAppSettings(){const n=NB();if(n)n.openAppSettings()}
+function pollNative(){const n=NB();if(!n)return;n.getPending().then(r=>{if(r&&r.start&&!inLesson)startChoice()}).catch(()=>{})}
 function afterSetup(){const n=NB();if(!n){try{Notification.requestPermission()}catch(e){}startChoice();return}
 n.hasOverlay().then(r=>{nat={ok:true,overlay:!!r.overlay,notif:r.notifications!==false,battery:!!r.battery};
 if(!nat.overlay&&confirm('Чтобы Бит мог напомнить об уроке поверх других приложений, нужно разрешение «Поверх других приложений». Открыть настройки?'))n.requestOverlay();

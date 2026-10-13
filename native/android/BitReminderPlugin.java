@@ -81,6 +81,11 @@ public class BitReminderPlugin extends Plugin {
         r.put("overlay", canOverlay());
         r.put("notifications", notificationsOk());
         r.put("battery", batteryOk());
+        SharedPreferences p = prefs();
+        r.put("running", BitReminderService.running);
+        r.put("lastTick", p.getLong("lastTick", 0L));
+        r.put("now", System.currentTimeMillis());
+        r.put("lastErr", p.getString("lastErr", ""));
         call.resolve(r);
     }
 
@@ -95,6 +100,12 @@ public class BitReminderPlugin extends Plugin {
         if (Build.VERSION.SDK_INT >= 33 && !notificationsOk() && getActivity() != null) {
             getActivity().requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 7731);
         }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        openSettings(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
         call.resolve();
     }
 
