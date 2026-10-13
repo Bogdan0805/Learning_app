@@ -22,10 +22,14 @@ jobs:
       # Встраиваем нативный код: баннеры поверх приложений, фоновая служба, разрешения
       - run: python3 native/patch_android.py
       - run: npx cap sync android
-      # Постоянный ключ подписи: новые версии устанавливаются поверх предыдущих
-      - run: mkdir -p ~/.android && cp native/debug.keystore ~/.android/debug.keystore
       - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
       - run: cp android/app/build/outputs/apk/debug/app-debug.apk Bit-learning-app-002.apk
+      # Подпись должна совпасть с постоянным ключом, иначе новая версия не встанет поверх старой
+      - name: Проверка подписи
+        run: |
+          exp=$(keytool -list -keystore native/debug.keystore -storepass android | grep "SHA-256" | sed 's/.*: //')
+          got=$(keytool -printcert -jarfile Bit-learning-app-002.apk | grep "SHA256:" | head -1 | sed 's/.*SHA256: //')
+          echo "ключ: $exp"; echo "apk:  $got"; [ "$exp" = "$got" ]
       - uses: actions/upload-artifact@v4
         with:
           name: Bit-learning-app-002-apk

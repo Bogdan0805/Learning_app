@@ -78,6 +78,26 @@ if g2 != g:
     gradle.write_text(g2, encoding="utf-8")
     print("версия: 0.2 (код 2)")
 
+# 3b. постоянный ключ подписи (чтобы новые версии ставились поверх старых)
+g = gradle.read_text(encoding="utf-8")
+if "native/debug.keystore" not in g:
+    sign = """
+    signingConfigs {
+        debug {
+            storeFile file("../../native/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+"""
+    m = re.search(r'namespace\s+"[^"]+"\n', g)
+    if not m:
+        fail("не нашёл namespace в android/app/build.gradle")
+    g = g[:m.end()] + sign + g[m.end():]
+    gradle.write_text(g, encoding="utf-8")
+    print("подпись: постоянный ключ native/debug.keystore")
+
 # 4. проверки
 import xml.dom.minidom
 xml.dom.minidom.parseString(manifest.read_text(encoding="utf-8"))
