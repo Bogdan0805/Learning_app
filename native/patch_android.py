@@ -76,11 +76,11 @@ else:
 
 # 3. версия приложения
 g = gradle.read_text(encoding="utf-8")
-g2 = re.sub(r"versionCode\s+\d+", "versionCode 3", g, count=1)
-g2 = re.sub(r'versionName\s+"[^"]*"', 'versionName "0.2.1"', g2, count=1)
+g2 = re.sub(r"versionCode\s+\d+", "versionCode 4", g, count=1)
+g2 = re.sub(r'versionName\s+"[^"]*"', 'versionName "0.2.2"', g2, count=1)
 if g2 != g:
     gradle.write_text(g2, encoding="utf-8")
-    print("версия: 0.2.1 (код 3)")
+    print("версия: 0.2.2 (код 4)")
 
 # 3b. постоянный ключ подписи (чтобы новые версии ставились поверх старых)
 g = gradle.read_text(encoding="utf-8")
