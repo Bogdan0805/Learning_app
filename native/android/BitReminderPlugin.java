@@ -1,5 +1,6 @@
 package com.bogdan0805.learningapp;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -40,6 +41,7 @@ public class BitReminderPlugin extends Plugin {
 
     private void startServiceIfNeeded() {
         if (BitReminderService.running) return;
+        EventLog.add(getContext(), "приложение просит запустить службу");
         try {
             Intent i = new Intent(getContext(), BitReminderService.class);
             if (Build.VERSION.SDK_INT >= 26) getContext().startForegroundService(i);
@@ -86,6 +88,8 @@ public class BitReminderPlugin extends Plugin {
         r.put("lastTick", p.getLong("lastTick", 0L));
         r.put("now", System.currentTimeMillis());
         r.put("lastErr", p.getString("lastErr", ""));
+        r.put("device", EventLog.device());
+        r.put("maker", String.valueOf(Build.MANUFACTURER).toLowerCase(java.util.Locale.ROOT));
         call.resolve(r);
     }
 
@@ -101,6 +105,60 @@ public class BitReminderPlugin extends Plugin {
             getActivity().requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 7731);
         }
         call.resolve();
+    }
+
+    @PluginMethod
+    public void getLog(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("log", EventLog.get(getContext()));
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void clearLog(PluginCall call) {
+        EventLog.clear(getContext());
+        call.resolve();
+    }
+
+    /** Открывает экран автозапуска/питания именно для производителя телефона, иначе — настройки приложения. */
+    @PluginMethod
+    public void openAutostart(PluginCall call) {
+        String maker = String.valueOf(Build.MANUFACTURER).toLowerCase(java.util.Locale.ROOT);
+        String[][] tries;
+        if (maker.contains("xiaomi") || maker.contains("redmi") || maker.contains("poco")) {
+            tries = new String[][]{{"com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"}};
+        } else if (maker.contains("huawei") || maker.contains("honor")) {
+            tries = new String[][]{
+                {"com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"},
+                {"com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"}};
+        } else if (maker.contains("oppo") || maker.contains("realme") || maker.contains("oneplus")) {
+            tries = new String[][]{
+                {"com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"},
+                {"com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"}};
+        } else if (maker.contains("vivo") || maker.contains("iqoo")) {
+            tries = new String[][]{
+                {"com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"},
+                {"com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"}};
+        } else if (maker.contains("samsung")) {
+            tries = new String[][]{{"com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity"}};
+        } else {
+            tries = new String[0][];
+        }
+        String opened = "";
+        for (String[] t : tries) {
+            try {
+                Intent i = new Intent();
+                i.setComponent(new ComponentName(t[0], t[1]));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(i);
+                opened = t[0];
+                break;
+            } catch (Throwable ignored) { }
+        }
+        if (opened.isEmpty()) openSettings(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        JSObject r = new JSObject();
+        r.put("opened", opened);
+        call.resolve(r);
     }
 
     @PluginMethod

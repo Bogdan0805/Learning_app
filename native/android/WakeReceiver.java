@@ -39,12 +39,14 @@ public class WakeReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context c, Intent intent) {
         SharedPreferences p = c.getSharedPreferences(BitReminderService.PREFS, Context.MODE_PRIVATE);
         if (!p.getBoolean("enabled", false)) return;
+        EventLog.add(c, BitReminderService.running ? "будильник сработал, служба жива" : "будильник сработал: служба была остановлена, запускаю");
         try {
             Intent s = new Intent(c, BitReminderService.class);
             if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(s); else c.startService(s);
             p.edit().putLong("lastWake", System.currentTimeMillis()).apply();
         } catch (Throwable t) {
             p.edit().putString("lastErr", "wake: " + t).apply();
+            EventLog.add(c, "ОШИБКА запуска службы будильником: " + t);
         }
         arm(c, 90000);
     }

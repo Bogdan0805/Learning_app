@@ -50,6 +50,8 @@ public class BitReminderService extends Service {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ReminderLogic logic = new ReminderLogic();
     private int ticks = 0;
+    private long lastTickWall = 0;
+    private boolean lastCanOverlay = true;
     private View overlay;
     private ObjectAnimator shake;
 
@@ -67,6 +69,7 @@ public class BitReminderService extends Service {
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
+        EventLog.add(this, intent == null ? "служба перезапущена системой" : "служба запущена");
         Notification n = bgNotification();
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(ID_BG, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
@@ -81,6 +84,7 @@ public class BitReminderService extends Service {
 
     @Override public void onTaskRemoved(Intent rootIntent) {
         // пользователь смахнул приложение из списка — быстро перезапускаем службу
+        EventLog.add(this, "приложение смахнуто из списка, перезапуск через 2 с");
         WakeReceiver.arm(this, 2000);
         super.onTaskRemoved(rootIntent);
     }
@@ -90,6 +94,7 @@ public class BitReminderService extends Service {
         handler.removeCallbacks(loop);
         hideOverlay();
         boolean en = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("enabled", false);
+        EventLog.add(this, "служба остановлена" + (en ? " (система), будильник вернёт её" : " (напоминания выключены)"));
         if (en) WakeReceiver.arm(this, 3000); else WakeReceiver.disarm(this);
         super.onDestroy();
     }
@@ -134,8 +139,18 @@ public class BitReminderService extends Service {
         int min = c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE);
         String today = c.get(Calendar.YEAR) + "-" + (c.get(Calendar.MONTH) + 1) + "-" + c.get(Calendar.DAY_OF_MONTH);
 
-        int act = L.tick(System.currentTimeMillis(), min, today, canOverlay());
-        if (act == ReminderLogic.DUE_NOTIFY) notifyDue(p, today);
+        long nowWall = System.currentTimeMillis();
+        if (lastTickWall != 0 && nowWall - lastTickWall > 5000) {
+            EventLog.add(this, "тики приостанавливались на " + ((nowWall - lastTickWall) / 1000) + " с (процесс «усыплён»)");
+        }
+        lastTickWall = nowWall;
+        boolean co = canOverlay();
+        if (co != lastCanOverlay) {
+            lastCanOverlay = co;
+            EventLog.add(this, co ? "разрешение «Поверх других приложений» есть" : "НЕТ разрешения «Поверх других приложений»");
+        }
+        int act = L.tick(nowWall, min, today, co);
+        if (act == ReminderLogic.DUE_NOTIFY) { EventLog.add(this, "наступило время урока" + (L.demo ? " (демо)" : "")); notifyDue(p, today); }
         else if (act == ReminderLogic.SHOW_BANNER) showOverlay();
         else if (act == ReminderLogic.HIDE_BANNER) { hideOverlay(); cancelDue(); }
     }
@@ -275,9 +290,11 @@ public class BitReminderService extends Service {
         try {
             ((WindowManager) getSystemService(WINDOW_SERVICE)).addView(root, lp);
             overlay = root;
+            EventLog.add(this, "баннер показан, стадия " + st);
         } catch (Throwable t) {
             if (shake != null) { shake.cancel(); shake = null; }
             noteErr(t);
+            EventLog.add(this, "ОШИБКА показа баннера: " + t);
             logic.bannerClosed(System.currentTimeMillis());
         }
     }
@@ -291,11 +308,13 @@ public class BitReminderService extends Service {
     }
 
     private void onClose() {
+        EventLog.add(this, "баннер закрыт кнопкой");
         logic.bannerClosed(System.currentTimeMillis());
         hideOverlay();
     }
 
     private void onLearn() {
+        EventLog.add(this, "нажато «Учиться»");
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean("pending", true).apply();
         logic.lessonStarted(System.currentTimeMillis());
         try { startActivity(launchIntent()); } catch (Throwable ignored) { }

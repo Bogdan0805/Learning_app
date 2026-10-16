@@ -1,0 +1,7 @@
+package com.getcapacitor;
+public class JSObject extends org.json.JSONObject {
+  public JSObject put(String k, boolean v){return this;}
+  public JSObject put(String k, int v){return this;}
+  public JSObject put(String k, long v){return this;}
+  public JSObject put(String k, String v){return this;}
+}

@@ -1,0 +1,12 @@
+{
+  "name": "bit-tests",
+  "private": true,
+  "description": "Автотесты приложения «Бит» (уроки, баннеры, теория). Запуск: npm install && npm test",
+  "scripts": {
+    "test": "node lessons.js && node verify_theory.js && node verify.js && node verify_native.js"
+  },
+  "devDependencies": {
+    "@sinonjs/fake-timers": "^15.4.0",
+    "jsdom": "^30.1.2"
+  }
+}

@@ -10,6 +10,7 @@ public class BootReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context c, Intent intent) {
         try {
             if (!c.getSharedPreferences(BitReminderService.PREFS, Context.MODE_PRIVATE).getBoolean("enabled", false)) return;
+            EventLog.add(c, "запуск после перезагрузки или обновления приложения");
             Intent s = new Intent(c, BitReminderService.class);
             if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(s); else c.startService(s);
         } catch (Throwable ignored) { }
