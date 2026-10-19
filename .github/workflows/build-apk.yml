@@ -23,22 +23,22 @@ jobs:
       - run: python3 native/patch_android.py
       - run: npx cap sync android
       - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
-      - run: cp android/app/build/outputs/apk/debug/app-debug.apk Bit-learning-app-002.apk
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk Bit-learning-app-003.apk
       # Подпись должна совпасть с постоянным ключом, иначе новая версия не встанет поверх старой
       - name: Проверка подписи
         run: |
           exp=$(keytool -list -keystore native/debug.keystore -storepass android | grep "SHA-256" | sed 's/.*: //')
-          got=$(keytool -printcert -jarfile Bit-learning-app-002.apk | grep "SHA256:" | head -1 | sed 's/.*SHA256: //')
+          got=$(keytool -printcert -jarfile Bit-learning-app-003.apk | grep "SHA256:" | head -1 | sed 's/.*SHA256: //')
           echo "ключ: $exp"; echo "apk:  $got"; [ "$exp" = "$got" ]
       - uses: actions/upload-artifact@v4
         with:
-          name: Bit-learning-app-002-apk
-          path: Bit-learning-app-002.apk
-      # Отдельный релиз 002. Релиз «latest» со старой сборкой не трогаем.
+          name: Bit-learning-app-003-apk
+          path: Bit-learning-app-003.apk
+      # Релиз 003. Релизы «latest» и «002» с прежними сборками не трогаем.
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: "002"
-          name: "Версия 002 — баннеры поверх других приложений"
-          body: "Сборка 002: баннер-напоминание поверх других приложений, работа в фоне, три стадии грозности. Предыдущая версия остаётся в релизе «Последняя сборка APK»."
-          files: Bit-learning-app-002.apk
+          tag_name: "003"
+          name: "Версия 003 — тревога-уведомления и диагностика"
+          body: "Сборка 003: баннер поверх других приложений, тревога-уведомления каждые 0,7 с на последней стадии, диагностика службы, подробная теория. Предыдущие версии остаются в релизах 002 и «Последняя сборка APK»."
+          files: Bit-learning-app-003.apk
           make_latest: "false"

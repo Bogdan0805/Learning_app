@@ -256,7 +256,7 @@ function drawW(c,a0){const x=c.getContext('2d'),W=c.width,R=W/2-6,it=items(),t=i
 function spinW(cb){const it=items(),t=it.reduce((p,q)=>p+q.w,0);let r=Math.random()*t,pick=it[0],st=0;for(const q of it){if(r<q.w){pick=q;break}r-=q.w;st+=q.w}
 const s=pick.w/t*2*Math.PI,mid=st/t*2*Math.PI+s*(0.5+(Math.random()-.5)*.7);let target=-Math.PI/2-mid;target-=Math.floor(target/(2*Math.PI))*2*Math.PI;const from=ang,end=ang+(((target-ang)%(2*Math.PI))+2*Math.PI)%(2*Math.PI)+10*Math.PI,t0=performance.now(),c=$('#w');
 (function f(n){const k=Math.min(1,(n-t0)/4000),e=1-Math.pow(1-k,3);ang=from+(end-from)*e;drawW(c,ang);if(k<1)requestAnimationFrame(f);else if(cb)setTimeout(()=>cb(pick.id),500)})(t0)}
-function home(){leaveFlow();A.innerHTML=head()+mascot(S.cnt>=S.n?'Дневная цель выполнена! Так держать 🎉':'Готов учиться? Всего ~10 минут!')+`<button class="btn" onclick="startChoice()">Начать урок</button><div class="card"><b>Прогресс</b>${ids.filter(i=>S.subs[i]>0).map(i=>{const p=(S.p[i]||0);return `<div class="row"><span>${D[i].e}</span><b style="font-size:14px">${D[i].n}</b><span style="font-size:13px">${p}/100</span></div><div class="bar"><i style="width:${p}%"></i></div>`}).join('')}</div><div id="perm">${permHtml()}</div><button class="btn alt" onclick="setup1()">Изменить предметы</button>${demoBtn()}`;refreshNative()}
+function home(){leaveFlow();A.innerHTML=head()+mascot(S.cnt>=S.n?'Дневная цель выполнена! Так держать 🎉':'Готов учиться? Всего ~10 минут!')+`<div id="perm">${permHtml()}</div><button class="btn" onclick="startChoice()">Начать урок</button><div class="card"><b>Прогресс</b>${ids.filter(i=>S.subs[i]>0).map(i=>{const p=(S.p[i]||0);return `<div class="row"><span>${D[i].e}</span><b style="font-size:14px">${D[i].n}</b><span style="font-size:13px">${p}/100</span></div><div class="bar"><i style="width:${p}%"></i></div>`}).join('')}</div><button class="btn alt" onclick="setup1()">Изменить предметы</button>${demoBtn()}<div class="mut" style="text-align:center;font-size:11px;margin:10px 0">Бит v${APP_VER}</div>`;refreshNative()}
 function startChoice(){hideTheory();inLesson=true;pushState();hideBan();A.innerHTML=head()+`<h2>Как выберем урок?</h2><button class="btn" onclick="randomPick()">🎡 Отдаться рандому</button><button class="btn alt" onclick="manual()">Выбрать самому</button><button class="btn alt" onclick="home()">Назад</button>`}
 function randomPick(){A.innerHTML=`<h2 class="c">Крутим колесо…</h2><div class="ptr">▼</div><canvas id="w" width="300" height="300"></canvas>`;drawW($('#w'),ang);spinW(id=>{A.innerHTML+=mascot(D[id].e+' '+D[id].n);setTimeout(()=>begin(id),1200)})}
 function manual(){A.innerHTML=`<h2>Выбери предмет</h2>`+ids.map(i=>`<button class="opt" onclick="begin('${i}')">${D[i].e} ${D[i].n} <span class="mut">— урок ${(S.p[i]||0)+1}</span></button>`).join('')+`<button class="btn alt" onclick="startChoice()">Назад</button>`}
@@ -295,10 +295,12 @@ const [h,m]=S.time.split(':').map(Number),d=new Date(),due=DEMO.on||d.getHours()
 if(!due)return;
 if(!trig){trig=Date.now();stage=0;nextShow=trig+(DEMO.on?5000:300000);notify()}
 if(!inLesson&&!banUp()&&Date.now()>=nextShow)showBan()}
-function NB(){try{return window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform()&&Capacitor.Plugins&&Capacitor.Plugins.BitReminder||null}catch(e){return null}}
-let nat={ok:false,overlay:false,notif:true,battery:false,run:false,err:''},tc=0,rfT=0;
+const APP_VER='0.3.0';
+function isNativeEnv(){try{return !!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())}catch(e){return false}}
+function NB(){try{const C=window.Capacitor;if(!isNativeEnv())return null;if(C.Plugins&&C.Plugins.BitReminder)return C.Plugins.BitReminder;if(C.nativePromise)return new Proxy({},{get:(_,m)=>(o)=>C.nativePromise('BitReminder',String(m),o||{})});return null}catch(e){return null}}
+let nat={ok:false,why:'',overlay:false,notif:true,battery:false,run:false,err:''},tc=0,rfT=0,launchAsked=false,permOpen=false;
 function dayKey(){const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
-function pushState(){try{const n=NB();if(!n)return;n.sync({enabled:!!S.setup,time:S.time||'17:00',n:S.n||1,cnt:S.cnt||0,dayKey:dayKey(),busy:!!inLesson,demo:!!DEMO.on}).catch(()=>{})}catch(e){}}
+function pushState(){try{const n=NB();if(!n)return;n.sync({enabled:!!S.setup,time:S.time||'17:00',n:S.n||1,cnt:S.cnt||0,dayKey:dayKey(),busy:!!inLesson,demo:!!DEMO.on,alarm:S.alarm!==false}).catch(()=>{})}catch(e){}}
 let logOpen=false,logText='';
 const esc=x=>String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function oemHint(m){m=m||'';
@@ -308,13 +310,29 @@ if(/huawei|honor/.test(m))return 'Huawei/Honor: Запуск приложени�
 if(/oppo|realme|oneplus/.test(m))return 'OPPO/Realme/OnePlus: разреши автозапуск для «Бит», а в настройках батареи выбери «Разрешить работу в фоне».';
 if(/vivo|iqoo/.test(m))return 'vivo/iQOO: разреши автозапуск и фоновую работу, в батарее выбери «Высокое потребление в фоне».';
 return 'В настройках батареи для «Бит» выбери «Без ограничений» и разреши автозапуск, если такой пункт есть.'}
-function permHtml(){if(!nat.ok)return '';const r=(v,t)=>`<div class="row"><span>${v?'✅':'⚠️'}</span><b style="font-size:14px">${t}</b></div>`;
-return `<div class="card"><b>Напоминания в фоне</b>${r(nat.overlay,'Баннер поверх других приложений')}${nat.overlay?'':'<button class="btn" onclick="askOverlay()">Разрешить показ поверх приложений</button>'}${r(nat.notif,'Уведомления')}${nat.notif?'':'<button class="btn alt" onclick="askNotif()">Разрешить уведомления</button>'}${r(nat.battery,'Без ограничений батареи')}${nat.battery?'':'<button class="btn alt" onclick="askBattery()">Не ограничивать в фоне</button>'}${r(nat.run,'Служба напоминаний: '+(nat.run?'работает':'не отвечает'))}${nat.err&&!nat.run?'<div class="mut" style="font-size:12px">'+esc(String(nat.err).slice(0,80))+'</div>':''}<div class="mut" style="font-size:12px;margin:6px 0">📱 ${esc(nat.dev||'')}</div><div class="mut" style="font-size:12px;margin:6px 0">${esc(oemHint(nat.maker))}</div><button class="btn alt" onclick="askAutostart()">Автозапуск и питание</button><button class="btn alt" onclick="askAppSettings()">Настройки приложения</button><button class="btn alt" onclick="toggleLog()">${logOpen?'Скрыть журнал':'Журнал службы (для диагностики)'}</button>${logOpen?`<textarea id="logta" readonly rows="9" style="width:100%;font-size:11px;margin-top:6px">${esc((nat.dev||'')+'\n'+logText)}</textarea><button class="btn alt" onclick="copyLog()">Копировать журнал</button>`:''}</div>`}
+function permHtml(){
+if(!nat.ok){if(!isNativeEnv())return '';return `<div class="card"><b>Напоминания в фоне</b><div class="row"><span>⚠️</span><b style="font-size:14px">Нативный модуль не отвечает</b></div><div class="mut" style="font-size:12px;margin:4px 0">${esc(nat.why||'жду ответ от Android…')}</div><div class="mut" style="font-size:12px">Версия приложения: ${APP_VER}. Если здесь ошибка — пришли её текст разработчику.</div></div>`}
+const bad=!nat.overlay||!nat.notif||!nat.run;
+if(!bad&&!permOpen&&!logOpen)return `<div class="card"><div class="row"><span>✅</span><b style="font-size:14px">Напоминания в фоне работают</b><span onclick="togglePerm()" style="cursor:pointer;font-size:13px">⚙️ Подробнее</span></div></div>`;
+const r=(v,t)=>`<div class="row"><span>${v?'✅':'⚠️'}</span><b style="font-size:14px">${t}</b></div>`;
+return `<div class="card"><b>Напоминания в фоне</b>${r(nat.overlay,'Баннер поверх других приложений')}${nat.overlay?'':'<button class="btn" onclick="askOverlay()">Разрешить показ поверх приложений</button>'}${r(nat.notif,'Уведомления')}${nat.notif?'':'<button class="btn alt" onclick="askNotif()">Разрешить уведомления</button>'}${r(nat.battery,'Без ограничений батареи')}${nat.battery?'':'<button class="btn alt" onclick="askBattery()">Не ограничивать в фоне</button>'}${r(nat.run,'Служба напоминаний: '+(nat.run?'работает':'не отвечает'))}${nat.err&&!nat.run?'<div class="mut" style="font-size:12px">'+esc(String(nat.err).slice(0,80))+'</div>':''}<button class="btn alt" onclick="toggleAlarm()">🔔 Тревога-уведомления (последняя стадия, каждые 0,7 с): ${S.alarm===false?'выкл':'вкл'}</button><div class="mut" style="font-size:12px;margin:6px 0">📱 ${esc(nat.dev||'')} · версия ${APP_VER}</div><div class="mut" style="font-size:12px;margin:6px 0">${esc(oemHint(nat.maker))}</div><button class="btn alt" onclick="askAutostart()">Автозапуск и питание</button><button class="btn alt" onclick="askAppSettings()">Настройки приложения</button><button class="btn alt" onclick="toggleLog()">${logOpen?'Скрыть журнал':'Журнал службы (для диагностики)'}</button>${logOpen?`<textarea id="logta" readonly rows="9" style="width:100%;font-size:11px;margin-top:6px">${esc((nat.dev||'')+'\n'+logText)}</textarea><button class="btn alt" onclick="copyLog()">Копировать журнал</button>`:''}${!bad&&permOpen?'<button class="btn alt" onclick="togglePerm()">Свернуть</button>':''}</div>`}
+function togglePerm(){permOpen=!permOpen;renderPerm()}
+function toggleAlarm(){S.alarm=(S.alarm===false);save();renderPerm()}
 function renderPerm(){const e=document.querySelector('#perm');if(e)e.innerHTML=permHtml()}
 function toggleLog(){logOpen=!logOpen;if(!logOpen){renderPerm();return}const n=NB();if(!n)return;n.getLog().then(r=>{logText=r.log||'(журнал пуст)';renderPerm()}).catch(()=>{logText='не удалось прочитать журнал';renderPerm()})}
 function copyLog(){const t=document.querySelector('#logta');if(!t)return;t.focus();t.select();try{document.execCommand('copy');alert('Журнал скопирован')}catch(e){}}
 function askAutostart(){const n=NB();if(n)n.openAutostart().catch(()=>{})}
-function refreshNative(){const n=NB();if(!n)return;n.hasOverlay().then(r=>{const age=(r.now||Date.now())-(r.lastTick||0);nat={ok:true,overlay:!!r.overlay,notif:r.notifications!==false,battery:!!r.battery,run:!!r.running&&r.lastTick>0&&age<15000,err:r.lastErr||'',dev:r.device||'',maker:r.maker||''};if(!logOpen)renderPerm();if(nat.overlay&&nat.run&&banUp())hideBan();if(!nat.notif&&S.setup&&!S.askedNotif){S.askedNotif=true;save();n.requestNotifications().catch(()=>{})}pushState();if(nat.overlay&&!nat.run&&!rfT)rfT=setTimeout(()=>{rfT=0;refreshNative()},2500)}).catch(()=>{})}
+function refreshNative(resume){const n=NB();
+if(!n){if(isNativeEnv()){nat={...nat,ok:false,why:'плагин BitReminder не найден в приложении (Capacitor.Plugins: '+Object.keys((window.Capacitor&&Capacitor.Plugins)||{}).join(', ')+')'};if(!logOpen)renderPerm()}return}
+n.hasOverlay().then(r=>{const age=(r.now||Date.now())-(r.lastTick||0);nat={ok:true,why:'',overlay:!!r.overlay,notif:r.notifications!==false,battery:!!r.battery,run:!!r.running&&r.lastTick>0&&age<15000,err:r.lastErr||'',dev:r.device||'',maker:r.maker||''};
+if(!logOpen)renderPerm();if(nat.overlay&&nat.run&&banUp())hideBan();
+pushState();
+if(nat.overlay&&!nat.run&&!rfT)rfT=setTimeout(()=>{rfT=0;refreshNative()},2500);
+if(resume&&r.alarming&&S.setup&&!inLesson)startChoice();
+autoAsk(n)}).catch(e=>{nat={...nat,ok:false,why:'hasOverlay: '+((e&&(e.message||e.errorMessage))||e)};if(!logOpen)renderPerm()})}
+function autoAsk(n){if(launchAsked||!S.setup||inLesson)return;launchAsked=true;
+if(!nat.notif)n.requestNotifications().catch(()=>{});
+if(!nat.overlay)setTimeout(()=>{if(!inLesson&&!nat.overlay&&confirm('Чтобы Бит напомнил об уроке поверх других приложений, нужно разрешение «Поверх других приложений». Открыть настройки?'))n.requestOverlay().catch(()=>{})},nat.notif?300:2500)}
 function askOverlay(){const n=NB();if(!n)return;alert('Откроются настройки. Включи для «Бит» пункт «Поверх других приложений», затем вернись в приложение.');n.requestOverlay()}
 function askNotif(){const n=NB();if(n)n.requestNotifications().then(()=>setTimeout(refreshNative,800)).catch(()=>{})}
 function askBattery(){const n=NB();if(n)n.requestBattery()}
@@ -325,6 +343,6 @@ n.hasOverlay().then(r=>{nat={ok:true,overlay:!!r.overlay,notif:r.notifications!=
 if(!nat.overlay&&confirm('Чтобы Бит мог напомнить об уроке поверх других приложений, нужно разрешение «Поверх других приложений». Открыть настройки?'))n.requestOverlay();
 startChoice()}).catch(()=>startChoice())}
 setInterval(tick,1000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshNative();tick()}});window.addEventListener('focus',()=>{refreshNative();tick()});refreshNative();pushState();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshNative(true);tick()}});window.addEventListener('focus',()=>{refreshNative(true);tick()});refreshNative();pushState();
 S.setup?home():setup1();
 </script></body></html>

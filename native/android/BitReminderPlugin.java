@@ -70,6 +70,7 @@ public class BitReminderPlugin extends Plugin {
         e.putString("cntDay", call.getString("dayKey", ""));
         e.putBoolean("busy", busy);
         e.putBoolean("demo", call.getBoolean("demo", false));
+        e.putBoolean("alarm", call.getBoolean("alarm", true));
         if (busy) e.putLong("busyAt", System.currentTimeMillis());
         e.apply();
         if (enabled) startServiceIfNeeded();
@@ -80,16 +81,22 @@ public class BitReminderPlugin extends Plugin {
     @PluginMethod
     public void hasOverlay(PluginCall call) {
         JSObject r = new JSObject();
-        r.put("overlay", canOverlay());
-        r.put("notifications", notificationsOk());
-        r.put("battery", batteryOk());
-        SharedPreferences p = prefs();
-        r.put("running", BitReminderService.running);
-        r.put("lastTick", p.getLong("lastTick", 0L));
-        r.put("now", System.currentTimeMillis());
-        r.put("lastErr", p.getString("lastErr", ""));
-        r.put("device", EventLog.device());
-        r.put("maker", String.valueOf(Build.MANUFACTURER).toLowerCase(java.util.Locale.ROOT));
+        StringBuilder errs = new StringBuilder();
+        SharedPreferences p = null;
+        try { p = prefs(); } catch (Throwable t) { errs.append("prefs: ").append(t).append("; "); }
+        try { r.put("overlay", canOverlay()); } catch (Throwable t) { r.put("overlay", false); errs.append("overlay: ").append(t).append("; "); }
+        try { r.put("notifications", notificationsOk()); } catch (Throwable t) { r.put("notifications", true); errs.append("notif: ").append(t).append("; "); }
+        try { r.put("battery", batteryOk()); } catch (Throwable t) { r.put("battery", false); errs.append("battery: ").append(t).append("; "); }
+        try { r.put("running", BitReminderService.running); } catch (Throwable t) { errs.append("running: ").append(t).append("; "); }
+        try { r.put("lastTick", p == null ? 0L : p.getLong("lastTick", 0L)); } catch (Throwable t) { errs.append("tick: ").append(t).append("; "); }
+        try { r.put("now", System.currentTimeMillis()); } catch (Throwable ignored) { }
+        try {
+            String e = p == null ? "" : p.getString("lastErr", "");
+            r.put("lastErr", errs.length() > 0 ? errs.toString() : e);
+        } catch (Throwable ignored) { }
+        try { r.put("device", EventLog.device()); } catch (Throwable ignored) { }
+        try { r.put("maker", String.valueOf(Build.MANUFACTURER).toLowerCase(java.util.Locale.ROOT)); } catch (Throwable ignored) { }
+        try { r.put("alarming", p != null && p.getBoolean("alarming", false)); } catch (Throwable ignored) { }
         call.resolve(r);
     }
 
@@ -181,6 +188,7 @@ public class BitReminderPlugin extends Plugin {
         if (pending) p.edit().putBoolean("pending", false).apply();
         JSObject r = new JSObject();
         r.put("start", pending);
+        r.put("alarming", p.getBoolean("alarming", false));
         call.resolve(r);
     }
 }

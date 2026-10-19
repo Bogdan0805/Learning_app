@@ -2,8 +2,8 @@ const {JSDOM}=require('jsdom'),FT=require('@sinonjs/fake-timers'),fs=require('fs
 const THEORY_INLINE=fs.readFileSync(__dirname+'/../www/theory.js','utf8');
 const html=fs.readFileSync(__dirname+'/../www/index.html','utf8').replace('<script src="theory.js"></script>','<script>'+THEORY_INLINE.replace(/<\/script>/g,'')+'</script>');
 const flush=()=>new Promise(r=>setImmediate(r));
-function make(state,startMs,{overlay=false,confirmAns=true,running=true,err='',maker='xiaomi',device='Xiaomi Redmi Note 12, Android 14 (API 34)'}={}){
-  const m={calls:[],pending:false,overlay,notif:true,log:[],running,err};
+function make(state,startMs,{overlay=false,confirmAns=true,running=true,err='',notif=true,maker='xiaomi',device='Xiaomi Redmi Note 12, Android 14 (API 34)'}={}){
+  const m={calls:[],pending:false,overlay,notif:true,log:[],running,err};m.notif=notif;
   let W=null;const plugin={sync:o=>{m.calls.push(o);return Promise.resolve()},
     hasOverlay:()=>{const n=(W?W.Date:Date).now();return Promise.resolve({overlay:m.overlay,notifications:m.notif,battery:false,running:m.running,lastTick:m.running?n-1000:0,now:n,lastErr:m.err,device,maker})},
     openAutostart:()=>{m.log.push('openAutostart');return Promise.resolve({opened:''})},
@@ -59,8 +59,8 @@ let fails=0;const ok=(n,c,i)=>{console.log((c?'✅':'❌')+' '+n+(i?'  → '+i:'
   a.ev("S.subs={math:5};setup2()");a.click('Начать первый урок');await flush();
   ok('отказ от разрешения: настройки не открываются, приложение работает',!a.m.log.includes('requestOverlay')&&a.w.document.querySelector('h2').textContent.includes('Как выберем'));}
  // 4. Уведомления запрашиваются один раз
- {const a=make(base,t0,{overlay:true});a.m.notif=false;await flush();a.tick(1500);await flush();a.w.dispatchEvent(new a.w.Event('focus'));await flush();
-  ok('уведомления запрошены ровно один раз',a.m.log.filter(x=>x==='requestNotifications').length===1,a.m.log.join(','));}
+ {const a=make(base,t0,{overlay:true,notif:false});await flush();a.tick(1500);await flush();a.w.dispatchEvent(new a.w.Event('focus'));await flush();
+  ok('уведомления запрошены ровно один раз за запуск',a.m.log.filter(x=>x==='requestNotifications').length===1,a.m.log.join(','));}
 
  // 5. Служба не работает (убита системой), а разрешение есть → запасной веб-баннер, диагностика в карточке
  {const a=make(base,t0,{overlay:true,running:false,err:'java.lang.IllegalStateException: test'});await flush();a.tick(1500);await flush();
@@ -69,7 +69,8 @@ let fails=0;const ok=(n,c,i)=>{console.log((c?'✅':'❌')+' '+n+(i?'  → '+i:'
   a.click('Демо');await flush();a.tick(6500);await flush();
   ok('служба мертва, приложение открыто: работает запасной веб-баннер',a.ban()==='s1',a.ban());
   a.m.running=true;a.m.err='';a.tick(31000);await flush();
-  ok('служба ожила: карточка «работает»',txt().includes('работает')&&!txt().includes('не отвечает'));
+  ok('служба ожила: карточка стала компактной «работают»',txt().includes('Напоминания в фоне работают')&&!txt().includes('не отвечает'));
+  a.w.document.querySelector('#perm [onclick="togglePerm()"]').click();
   ok('служба ожила: веб-баннер убран, дальше баннеры нативные',a.ban()==='нет');
   a.click('Настройки приложения');await flush();
   ok('кнопка «Настройки приложения» открывает системные настройки',a.m.log.includes('openAppSettings'));}
@@ -77,6 +78,7 @@ let fails=0;const ok=(n,c,i)=>{console.log((c?'✅':'❌')+' '+n+(i?'  → '+i:'
  // 6. Диагностика: модель телефона, подсказка для производителя, автозапуск, журнал службы
  {const a=make(base,t0,{overlay:true});await flush();a.tick(1500);await flush();
   const txt=()=>a.w.document.querySelector('#perm').textContent;
+  a.w.document.querySelector('#perm [onclick="togglePerm()"]').click();
   ok('карточка показывает модель телефона',txt().includes('Xiaomi Redmi Note 12'),txt().slice(-160));
   ok('для Xiaomi показана своя инструкция (автозапуск, всплывающие окна)',txt().includes('Автозапуск')&&txt().includes('Всплывающие окна'));
   a.click('Автозапуск и питание');await flush();
@@ -88,7 +90,7 @@ let fails=0;const ok=(n,c,i)=>{console.log((c?'✅':'❌')+' '+n+(i?'  → '+i:'
   ok('при обновлении состояния открытый журнал не сбрасывается',!!a.w.document.querySelector('#logta'));
   a.click('Скрыть журнал');await flush();
   ok('журнал скрывается',!a.w.document.querySelector('#logta'));}
- {const a=make(base,t0,{overlay:true,maker:'samsung',device:'samsung SM-S911B, Android 14 (API 34)'});await flush();a.tick(1500);await flush();
+ {const a=make(base,t0,{overlay:true,maker:'samsung',device:'samsung SM-S911B, Android 14 (API 34)'});await flush();a.tick(1500);await flush();a.w.document.querySelector('#perm [onclick="togglePerm()"]').click();
   ok('для Samsung — инструкция про «Никогда не спящие»',a.w.document.querySelector('#perm').textContent.includes('Никогда не спящие'));}
  console.log(fails?`\nПРОВАЛОВ: ${fails}`:'\nВСЁ ОК');
 process.exit(fails?1:0);

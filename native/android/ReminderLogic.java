@@ -14,6 +14,7 @@ final class ReminderLogic {
     boolean busy;
     long busyAt;
     boolean demo;
+    boolean alarmEnabled = true;
 
     // состояние
     long trig = 0;
@@ -53,6 +54,11 @@ final class ReminderLogic {
             return SHOW_BANNER;
         }
         return res;
+    }
+
+    /** Тревога-уведомления: идут параллельно баннеру на последней (3-й) стадии, пока урок дня не пройден. */
+    boolean alarmActive(long now) {
+        return enabled && alarmEnabled && trig != 0 && stage >= 3 && !busyNow(now);
     }
 
     void bannerClosed(long now) { bannerUp = false; nextShow = now + interval(); }

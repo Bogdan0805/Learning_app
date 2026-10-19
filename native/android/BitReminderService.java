@@ -35,8 +35,9 @@ import java.util.Calendar;
 /** Фоновая служба: следит за расписанием и показывает баннер поверх других приложений. */
 public class BitReminderService extends Service {
     static final String PREFS = "bit_reminder";
-    static final String CH_BG = "bit_bg", CH_DUE = "bit_due";
-    static final int ID_BG = 1, ID_DUE = 2;
+    static final String CH_BG = "bit_bg", CH_DUE = "bit_due", CH_ALARM = "bit_alarm";
+    static final int ID_BG = 1, ID_DUE = 2, ID_ALARM = 3;
+    static final long ALARM_INTERVAL_MS = 700;
     static volatile boolean running = false;
 
     private static final String[] FACES = {"🤖", "😠", "👿"};
@@ -45,15 +46,35 @@ public class BitReminderService extends Service {
         "Бит ждёт тебя. Всего 10 минут!",
         "Бит уже сердится. Не откладывай!",
         "Бит в ярости! Пройди урок СЕЙЧАС!"};
+    private static final String[] ALARM_TEXTS = {
+        "Бит ждёт! Пройди урок 😠",
+        "Хватит откладывать! 👿",
+        "Один урок — и я отстану 🤖",
+        "СЕЙЧАС! Урок ждёт 🔥"};
     private static final int[] COLORS = {0xF2F59E0B, 0xF5EA580C, 0xFAB91C1C};
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ReminderLogic logic = new ReminderLogic();
     private int ticks = 0;
+    private int alarmN = 0;
+    private boolean alarmRunning = false;
     private long lastTickWall = 0;
     private boolean lastCanOverlay = true;
     private View overlay;
     private ObjectAnimator shake;
+
+    private final Runnable alarmLoop = new Runnable() {
+        @Override public void run() {
+            try {
+                if (logic.alarmActive(System.currentTimeMillis())) {
+                    postAlarm();
+                    handler.postDelayed(this, ALARM_INTERVAL_MS);
+                } else {
+                    stopAlarm();
+                }
+            } catch (Throwable t) { noteErr(t); stopAlarm(); }
+        }
+    };
 
     private final Runnable loop = new Runnable() {
         @Override public void run() {
@@ -93,6 +114,7 @@ public class BitReminderService extends Service {
         running = false;
         handler.removeCallbacks(loop);
         hideOverlay();
+        stopAlarm();
         boolean en = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("enabled", false);
         EventLog.add(this, "служба остановлена" + (en ? " (система), будильник вернёт её" : " (напоминания выключены)"));
         if (en) WakeReceiver.arm(this, 3000); else WakeReceiver.disarm(this);
@@ -122,7 +144,7 @@ public class BitReminderService extends Service {
         SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
         ReminderLogic L = logic;
         L.enabled = p.getBoolean("enabled", false);
-        if (!L.enabled) { hideOverlay(); stopSelf(); return; }
+        if (!L.enabled) { hideOverlay(); stopAlarm(); stopSelf(); return; }
         ticks++;
         if (ticks % 5 == 1) p.edit().putLong("lastTick", System.currentTimeMillis()).apply();
         if (ticks % 30 == 1) WakeReceiver.arm(this, 90000);
@@ -133,6 +155,7 @@ public class BitReminderService extends Service {
         L.busy = p.getBoolean("busy", false);
         L.busyAt = p.getLong("busyAt", 0);
         L.demo = p.getBoolean("demo", false);
+        L.alarmEnabled = p.getBoolean("alarm", true);
         if (L.bannerUp && overlay == null) L.bannerUp = false;
 
         Calendar c = Calendar.getInstance();
@@ -153,6 +176,7 @@ public class BitReminderService extends Service {
         if (act == ReminderLogic.DUE_NOTIFY) { EventLog.add(this, "наступило время урока" + (L.demo ? " (демо)" : "")); notifyDue(p, today); }
         else if (act == ReminderLogic.SHOW_BANNER) showOverlay();
         else if (act == ReminderLogic.HIDE_BANNER) { hideOverlay(); cancelDue(); }
+        if (L.alarmActive(nowWall)) startAlarm(); else stopAlarm();
     }
 
     // ---------- уведомления ----------
@@ -163,8 +187,12 @@ public class BitReminderService extends Service {
         if (Build.VERSION.SDK_INT < 26) return;
         NotificationChannel bg = new NotificationChannel(CH_BG, "Работа в фоне", NotificationManager.IMPORTANCE_LOW);
         NotificationChannel due = new NotificationChannel(CH_DUE, "Напоминание об уроке", NotificationManager.IMPORTANCE_HIGH);
+        NotificationChannel alarm = new NotificationChannel(CH_ALARM, "Тревога: пора учиться", NotificationManager.IMPORTANCE_HIGH);
+        alarm.enableVibration(true);
+        alarm.setVibrationPattern(new long[]{0, 200, 100, 200});
         nm().createNotificationChannel(bg);
         nm().createNotificationChannel(due);
+        nm().createNotificationChannel(alarm);
     }
 
     private Notification.Builder builder(String channel) {
@@ -208,6 +236,41 @@ public class BitReminderService extends Service {
             b.setDefaults(Notification.DEFAULT_ALL);
         }
         try { nm().notify(ID_DUE, b.build()); } catch (Throwable ignored) { }
+    }
+
+    /** Тревога: на последней стадии баннера шлём уведомление каждые 0,7 с, пока урок дня не пройден. */
+    private void startAlarm() {
+        if (alarmRunning) return;
+        alarmRunning = true;
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean("alarming", true).apply();
+        EventLog.add(this, "тревога-уведомления: старт (каждые 0,7 с)");
+        handler.post(alarmLoop);
+    }
+
+    private void stopAlarm() {
+        if (!alarmRunning) return;
+        alarmRunning = false;
+        handler.removeCallbacks(alarmLoop);
+        try { nm().cancel(ID_ALARM); } catch (Throwable ignored) { }
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean("alarming", false).apply();
+        EventLog.add(this, "тревога-уведомления: стоп");
+    }
+
+    private void postAlarm() {
+        Notification.Builder b = builder(CH_ALARM)
+            .setSmallIcon(getApplicationInfo().icon)
+            .setContentTitle("Бит: пора учиться! 🤖")
+            .setContentText(ALARM_TEXTS[alarmN++ % ALARM_TEXTS.length])
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(false)
+            .setCategory(Notification.CATEGORY_ALARM)
+            .setWhen(System.currentTimeMillis())
+            .setContentIntent(openApp());
+        if (Build.VERSION.SDK_INT < 26) {
+            b.setPriority(Notification.PRIORITY_MAX);
+            b.setDefaults(Notification.DEFAULT_ALL);
+        }
+        nm().notify(ID_ALARM, b.build());
     }
 
     private void cancelDue() { try { nm().cancel(ID_DUE); } catch (Throwable ignored) { } }

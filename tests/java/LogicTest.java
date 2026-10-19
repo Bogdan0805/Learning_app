@@ -5,6 +5,7 @@ public class LogicTest {
   static String name(int a){return new String[]{"NONE","DUE_NOTIFY","SHOW","HIDE"}[a];}
   // симулятор: шаг 1 сек, возвращает последнее действие
   static long now; static ReminderLogic L; static int min; static String day="d1";
+  static void untilBanner(){for(int i=0;i<400&&!L.bannerUp;i++)adv(1);}
   static int adv(int sec){int last=0;for(int i=0;i<sec;i++){now+=1000;int a=L.tick(now,min,day,true);if(a!=0)last=a;}return last;}
   static ReminderLogic fresh(int due){L=new ReminderLogic();L.enabled=true;L.dueMinutes=due;L.perDay=1;L.cntDay=day;L.cnt=0;now=1_000_000L;min=10*60;return L;}
   public static void main(String[] a){
@@ -43,6 +44,20 @@ public class LogicTest {
     // 8. Нет разрешения — баннера нет, уведомление есть
     fresh(17*60);min=18*60;now+=0;int sh=0,du=0;for(int i=0;i<400;i++){now+=1000;int x=L.tick(now,min,day,false);if(x==2)sh++;if(x==1)du++;}
     ok("без разрешения: баннеров 0, уведомление 1",sh==0&&du==1,"sh="+sh+" du="+du);
+    // 9. Тревога-уведомления (каждые 0,7 с в службе): только на 3-й стадии, пока урок не пройден
+    fresh(17*60);min=18*60;adv(3);
+    ok("до первого баннера тревоги нет",!L.alarmActive(now),"");
+    untilBanner();ok("стадия 1 — тревоги нет",L.stage==1&&!L.alarmActive(now),"stage="+L.stage);
+    L.bannerClosed(now);untilBanner();ok("стадия 2 — тревоги нет",L.stage==2&&!L.alarmActive(now),"stage="+L.stage);
+    L.bannerClosed(now);untilBanner();ok("стадия 3 — тревога включилась вместе с баннером",L.stage==3&&L.alarmActive(now),"stage="+L.stage);
+    L.bannerClosed(now);ok("баннер закрыт на 3-й стадии — тревога продолжается",L.alarmActive(now),"");
+    L.busy=true;L.busyAt=now;ok("человек в уроке — тревога молчит",!L.alarmActive(now),"");
+    L.busy=false;L.alarmEnabled=false;ok("выключено в настройках — молчит",!L.alarmActive(now),"");
+    L.alarmEnabled=true;ok("включили обратно — снова идёт",L.alarmActive(now),"");
+    L.cnt=1;adv(2);ok("урок пройден — тревога остановлена",!L.alarmActive(now),"");
+    fresh(17*60);L.demo=true;adv(3);untilBanner();L.bannerClosed(now);untilBanner();L.bannerClosed(now);untilBanner();
+    ok("демо: на 3-й стадии тревога идёт",L.stage==3&&L.alarmActive(now),"stage="+L.stage);
+    L.demo=false;adv(2);ok("демо выключено — тревога остановлена",!L.alarmActive(now),"");
     System.out.println(fails==0?"\nВСЁ ОК":"\nПРОВАЛОВ: "+fails);
   }
 }
